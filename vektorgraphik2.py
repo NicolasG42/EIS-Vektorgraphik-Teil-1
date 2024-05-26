@@ -1,11 +1,6 @@
 from PySide6.QtCore import Qt, QRectF, QPointF
-from PySide6.QtGui import QKeySequence, QImage
-from PySide6.QtGui import QPainter, QColor
-from PySide6.QtWidgets import QApplication, QMenuBar, QToolBar
-from PySide6.QtWidgets import QWidget, QFileDialog
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QVBoxLayout
-from PySide6.QtCore import Qt
-
+from PySide6.QtGui import QKeySequence, QImage, QPainter, QColor
+from PySide6.QtWidgets import QApplication, QMenuBar, QToolBar, QWidget, QFileDialog, QMainWindow, QMessageBox, QVBoxLayout
 import sys
 import math
 
@@ -19,6 +14,9 @@ class Rectangle:
         self.fill_color = fill_color
         self.border_color = border_color
 
+    def contains(self, point):
+        return self.x <= point.x() <= self.x + self.width and self.y <= point.y() <= self.y + self.height
+
 class Circle:
     def __init__(self, x, y, radius, fill_color, border_color):
         self.x = x
@@ -27,14 +25,22 @@ class Circle:
         self.fill_color = fill_color
         self.border_color = border_color
 
+    def contains(self, point):
+        return (self.x - point.x())**2 + (self.y - point.y())**2 <= self.radius**2
+
 class Star:
-    def __init__(self, x, y, radius, points, fill_color, border_color):
+    def __init__(self, x, y, radius, points, fill_color, border_color, border_width):
         self.x = x
         self.y = y
         self.radius = radius
         self.points = points
         self.fill_color = fill_color
         self.border_color = border_color
+        self.border_width = border_width
+
+    def contains(self, point):
+        # A simple bounding box check for demonstration purposes
+        return self.x - self.radius <= point.x() <= self.x + self.radius and self.y - self.radius <= point.y() <= self.y + self.radius
 
 class Scene:
     def __init__(self):
@@ -51,6 +57,8 @@ class MyPaintArea(QWidget):
         self.image: QImage = QImage(640, 480, QImage.Format_RGB32)
         self.image.fill(QColor(255, 255, 255))
         self.scene = Scene()
+        self.selected_object = None
+        self.last_mouse_position = QPointF()
 
     def load_image(self, filename):
         self.image = QImage(filename)
@@ -86,7 +94,6 @@ class MyPaintArea(QWidget):
                 self.draw_star(painter, obj)
 
     def draw_star(self, painter, star):
-        print("Drawing star...")
         points = []
         angle = math.pi / star.points  # Winkel für einen Sternzacken
 
@@ -94,28 +101,50 @@ class MyPaintArea(QWidget):
             r = star.radius if i % 2 == 0 else star.radius / 2
             theta = i * angle
             x = star.x + r * math.cos(theta)
-            y = star.y + r * math.sin(theta)  # Y-Koordinate korrigiert
+            y = star.y + r * math.sin(theta)
             points.append(QPointF(x, y))
         
         painter.drawPolygon(points)
 
     def rectangle(self):
-        self.scene = Scene()
-        self.scene.add_object(Rectangle(50, 50, 100, 150, (255, 0, 0), (2230, 3022, 1102)))
+        self.scene.add_object(Rectangle(50, 50, 100, 150, (255, 0, 0), (0, 0, 0)))
         self.update()
     
     def circle(self):
-        self.scene = Scene()
-        # Zweite Testszene mit anderen geometrischen Formen und Farben
-        self.scene.add_object(Circle(400, 200, 80, (255, 255, 0), (0, 0, 0)))  # Gelber Kreis
+        self.scene.add_object(Circle(400, 200, 80, (255, 255, 0), (0, 0, 0)))
         self.update()
 
     def star(self):
-        self.scene = Scene()
-        # Zweite Testszene mit anderen geometrischen Formen und Farben
-        self.scene.add_object(Star(550, 300, 70, 7, (255, 0, 255), (0, 0, 0)))  # Magenta Stern
+        self.scene.add_object(Star(550, 300, 70, 7, (255, 0, 255), (0, 0, 0), 1402))
         self.update()
-        
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.selected_object = self.find_object_at(event.position())
+            self.last_mouse_position = event.position()
+
+    def mouseMoveEvent(self, event):
+        if self.selected_object:
+            dx = event.position().x() - self.last_mouse_position.x()
+            dy = event.position().y() - self.last_mouse_position.y()
+            self.last_mouse_position = event.position()
+
+            if isinstance(self.selected_object, (Rectangle, Circle, Star)):
+                self.selected_object.x += dx
+                self.selected_object.y += dy
+
+            self.update()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.selected_object = None
+
+    def find_object_at(self, position):
+        for obj in self.scene.objects:
+            if obj.contains(position):
+                return obj
+        return None
+
 class MyWindow(QMainWindow):
     def __init__(self, parent: QWidget):
         super().__init__(parent)
@@ -127,8 +156,9 @@ class MyWindow(QMainWindow):
         centralWidget.setLayout(layout)
         self.setCentralWidget(centralWidget)
 
-        self.file_menu: QMenuBar = self.menuBar().addMenu("File...")
-        self.help_menu: QMenuBar = self.menuBar().addMenu("Help...")
+        #menüs und aktionen
+        self.file_menu: QMenuBar = self.menuBar().addMenu("File")
+        self.help_menu: QMenuBar = self.menuBar().addMenu("Help")
         self.open_action = self.file_menu.addAction("Open File")
         self.open_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_O))
         self.saveAs_action = self.file_menu.addAction("Save As...")
@@ -142,7 +172,8 @@ class MyWindow(QMainWindow):
         self.saveAs_action.triggered.connect(self.save_file)
         self.info_action.triggered.connect(self.show_info)
         self.quit_action.triggered.connect(self.show_quit_warning)
-
+        
+        #toolbar
         self.nice_toolbar: QToolBar = self.addToolBar("Some Nice Tools")
         self.nice_toolbar.addAction("Open", self.load_file)
         self.nice_toolbar.addAction("Save", self.save_file)
@@ -151,7 +182,6 @@ class MyWindow(QMainWindow):
         self.nice_toolbar.addAction("Rectangle", self.paint_area.rectangle)
         self.nice_toolbar.addAction("Circle", self.paint_area.circle)
         self.nice_toolbar.addAction("Star", self.paint_area.star)
-
 
     def show_quit_warning(self):
         ret = QMessageBox.question(self, "Ufpasse!", "Möchtest Du das Programm wirklich schließen? :(", QMessageBox.Yes, QMessageBox.No)
