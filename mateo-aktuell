@@ -1,0 +1,265 @@
+from PySide6.QtCore import Qt, QRect, QPoint
+from PySide6.QtGui import QKeySequence, QImage, QPainter, QColor, QPen, QAction, QPolygon
+from PySide6.QtWidgets import QApplication, QMenuBar, QToolBar, QWidget, QFileDialog, QMainWindow, QMessageBox, QVBoxLayout, QColorDialog
+import sys
+import math
+
+class Rectangle:
+    def __init__(self, rect: QRect):
+        self.rect = rect
+
+    def draw(self, painter: QPainter, selected: bool = False):
+        pen = QPen(Qt.red if selected else Qt.black, 3 if selected else 2, Qt.SolidLine)
+        painter.setPen(pen)
+        painter.drawRect(self.rect)
+
+    def contains(self, point: QPoint) -> bool:
+        return self.rect.contains(point)
+
+class Circle:
+    def __init__(self, center: QPoint, radius: int):
+        self.center = center
+        self.radius = radius
+
+    def draw(self, painter: QPainter, selected: bool = False):
+        pen = QPen(Qt.red if selected else Qt.black, 3 if selected else 2, Qt.SolidLine)
+        painter.setPen(pen)
+        painter.drawEllipse(self.center, self.radius, self.radius)
+
+    def contains(self, point: QPoint) -> bool:
+        return (self.center - point).manhattanLength() <= self.radius
+
+class Star:
+    def __init__(self, x, y, radius, points, fill_color, border_color):
+        self.x = x
+        self.y = y
+        self.radius = radius
+        self.points = points
+        self.fill_color = fill_color
+        self.border_color = border_color
+
+    def draw(self, painter: QPainter, selected: bool = False):
+        pen = QPen(Qt.red if selected else self.border_color, 3 if selected else 2, Qt.SolidLine)
+        painter.setPen(pen)
+        painter.setBrush(self.fill_color)
+        polygon = self.create_star_polygon()
+        painter.drawPolygon(polygon)
+
+    def create_star_polygon(self):
+        points = []
+        angle_step = 2 * math.pi / (self.points * 2)
+        for i in range(self.points * 2):
+            angle = i * angle_step
+            radius = self.radius if i % 2 == 0 else self.radius / 2
+            x = self.x + radius * math.cos(angle)
+            y = self.y - radius * math.sin(angle)
+            points.append(QPoint(x, y))
+        return QPolygon(points)
+
+    def contains(self, point: QPoint) -> bool:
+        polygon = self.create_star_polygon()
+        return polygon.containsPoint(point, Qt.OddEvenFill)
+
+class MyPaintArea(QWidget): 
+    def __init__(self, parent: QWidget = None): 
+        super().__init__(parent)
+
+        self.setMinimumWidth(1200)
+        self.setMinimumHeight(780)
+        self.image = QImage(1200, 780, QImage.Format_RGB32)
+        self.image.fill(QColor(255, 255, 255))
+        self.drawing = False
+        self.drawing_mode = False
+        self.draw_rect_mode = False
+        self.draw_circle_mode = False
+        self.draw_star_mode = False
+        self.rectangles = []
+        self.selected_rect = None
+        self.circles = []
+        self.selected_circle = None
+        self.stars = []
+        self.selected_star = None
+        self.moving_shape = False
+        self.offset = QPoint()
+
+    def load_image(self, filename):
+        self.image = QImage(filename)
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.drawImage(0, 0, self.image)
+        for rect in self.rectangles:
+            rect.draw(painter, selected=(rect == self.selected_rect))
+        for circle in self.circles:
+            circle.draw(painter, selected=(circle == self.selected_circle))
+        for star in self.stars:
+            star.draw(painter, selected=(star == self.selected_star))
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            if self.drawing_mode:
+                self.drawing = True
+                self.lastPoint = event.pos()
+                painter = QPainter(self.image)
+                painter.drawPoint(event.pos())
+                self.update()
+            elif self.draw_rect_mode:
+                self.drawing = True
+                self.start_point = event.pos()
+                new_rect = Rectangle(QRect(self.start_point - QPoint(50, 50), self.start_point + QPoint(50, 50)))
+                self.rectangles.append(new_rect)
+                self.update()
+            elif self.draw_circle_mode:
+                self.drawing = True
+                new_circle = Circle(event.pos(), 50)
+                self.circles.append(new_circle)
+                self.update()
+            elif self.draw_star_mode:
+                self.drawing = True
+                new_star = Star(event.pos().x(), event.pos().y(), 50, 5, QColor(Qt.transparent), QColor(Qt.black))
+                self.stars.append(new_star)
+                self.update()
+            else:
+                self.select_shape(event.pos())
+
+    def select_shape(self, pos):
+        self.selected_rect = next((rect for rect in self.rectangles if rect.contains(pos)), None)
+        self.selected_circle = next((circle for circle in self.circles if circle.contains(pos)), None)
+        self.selected_star = next((star for star in self.stars if star.contains(pos)), None)
+
+        if self.selected_rect or self.selected_circle or self.selected_star:
+            self.moving_shape = True
+            self.offset = pos - (self.selected_rect.rect.topLeft() if self.selected_rect else
+                                 self.selected_circle.center if self.selected_circle else
+                                 QPoint(self.selected_star.x, self.selected_star.y))
+        self.update()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.drawing = False
+            self.moving_shape = False
+
+    def mouseMoveEvent(self, event):
+        if (event.buttons() & Qt.LeftButton) and self.drawing_mode and self.drawing:
+            painter = QPainter(self.image)
+            painter.drawLine(self.lastPoint, event.pos())
+            self.lastPoint = event.pos()
+            self.update()
+        elif self.moving_shape:
+            new_pos = event.pos() - self.offset
+            if self.selected_rect:
+                self.selected_rect.rect.moveTopLeft(new_pos)
+            elif self.selected_circle:
+                self.selected_circle.center = new_pos
+            elif self.selected_star:
+                self.selected_star.x = new_pos.x()
+                self.selected_star.y = new_pos.y()
+            self.update()
+
+    def clear_selection(self):
+        self.selected_rect = None
+        self.selected_circle = None
+        self.selected_star = None
+
+    def toggle_drawing_mode(self):
+        self.clear_selection()
+        self.drawing_mode = not self.drawing_mode
+        self.draw_rect_mode = False
+        self.draw_circle_mode = False
+        self.draw_star_mode = False
+        self.update()
+        print("Drawing Mode:", self.drawing_mode)
+
+    def toggle_draw_rect_mode(self):
+        self.clear_selection()
+        self.draw_rect_mode = not self.draw_rect_mode
+        self.draw_circle_mode = False
+        self.draw_star_mode = False
+        self.drawing_mode = False
+        self.update()
+        print("Draw Rect Mode:", self.draw_rect_mode)
+
+    def toggle_draw_circle_mode(self):
+        self.clear_selection()
+        self.draw_circle_mode = not self.draw_circle_mode
+        self.draw_rect_mode = False
+        self.draw_star_mode = False
+        self.drawing_mode = False
+        self.update()
+        print("Draw Circle Mode:", self.draw_circle_mode)
+
+    def toggle_draw_star_mode(self):
+        self.clear_selection()
+        self.draw_star_mode = not self.draw_star_mode
+        self.draw_rect_mode = False
+        self.draw_circle_mode = False
+        self.drawing_mode = False
+        self.update()
+        print("Draw Star Mode:", self.draw_star_mode)
+
+class MyWindow(QMainWindow):
+    def __init__(self, parent: QWidget = None):
+        super().__init__(parent)
+        self.paint_area = MyPaintArea(self)
+        layout = QVBoxLayout()
+        layout.addWidget(self.paint_area)
+
+        centralWidget = QWidget()
+        centralWidget.setLayout(layout)
+        self.setCentralWidget(centralWidget)
+
+        self.file_menu = self.menuBar().addMenu("File...")
+        self.help_menu = self.menuBar().addMenu("Help...")
+
+        self.open_action = self.file_menu.addAction("Open File")
+        self.open_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_O))
+        self.saveAs_action = self.file_menu.addAction("Save As...")
+        self.saveAs_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_S))
+        self.quit_action = self.file_menu.addAction("Quit")
+        self.quit_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_Q))
+        self.info_action = self.help_menu.addAction("Info")
+        self.info_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_I))
+
+        self.open_action.triggered.connect(self.load_file)
+        self.saveAs_action.triggered.connect(self.save_file)
+        self.info_action.triggered.connect(self.show_info)
+        self.quit_action.triggered.connect(self.show_quit_warning)
+
+        self.nice_toolbar = self.addToolBar("Some Nice Tools")
+        self.nice_toolbar.addAction("Open", self.load_file)
+        self.nice_toolbar.addAction("Save", self.save_file)
+        self.nice_toolbar.addAction("Info", self.show_info)
+        self.nice_toolbar.addAction("Quit", self.show_quit_warning)
+
+        self.nice_toolbar.addAction("Draw", self.paint_area.toggle_drawing_mode)
+        self.nice_toolbar.addAction("Draw Rect", self.paint_area.toggle_draw_rect_mode)
+        self.nice_toolbar.addAction("Draw Circle", self.paint_area.toggle_draw_circle_mode)
+        self.nice_toolbar.addAction("Draw Star", self.paint_area.toggle_draw_star_mode)
+
+    def load_file(self):
+        file_name, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "PNG Files (*.png)")
+        if file_name:
+            self.paint_area.load_image(file_name)
+
+    def save_file(self):
+        file_name, _ = QFileDialog.getSaveFileName(self, "Save As", "picture", "PNG Files (*.png)")
+        if file_name:
+            self.paint_area.image.save(file_name)
+
+    def show_info(self):
+        QMessageBox.information(self, "Info", "This is a simple text editor.", QMessageBox.Ok)
+
+    def show_quit_warning(self):
+        ret = QMessageBox.question(self, "ALARM!", "Möchtest Du das Programm wirklich schließen? :(", QMessageBox.Yes | QMessageBox.No)
+        if ret == QMessageBox.Yes:
+            self.close()
+        else:
+            print("Programm wird fortgesetzt")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    main_window = MyWindow()
+    main_window.setWindowTitle("Joa")
+    main_window.show()
+    app.exec()
