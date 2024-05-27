@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtGui import QKeySequence, QImage, QPainter, QColor
-from PySide6.QtWidgets import QApplication, QMenuBar, QToolBar, QWidget, QFileDialog, QMainWindow, QMessageBox, QVBoxLayout
+from PySide6.QtWidgets import QApplication, QMenuBar, QToolBar, QWidget, QFileDialog, QMainWindow, QMessageBox, QVBoxLayout, QInputDialog
 import sys
 import math
 
@@ -106,16 +106,16 @@ class MyPaintArea(QWidget):
         
         painter.drawPolygon(points)
 
-    def rectangle(self):
-        self.scene.add_object(Rectangle(50, 50, 100, 150, (255, 0, 0), (0, 0, 0)))
+    def rectangle(self, x, y, width, height, fill_color, border_color):
+        self.scene.add_object(Rectangle(x, y, width, height, fill_color, border_color))
         self.update()
     
-    def circle(self):
-        self.scene.add_object(Circle(400, 200, 80, (255, 255, 0), (0, 0, 0)))
+    def circle(self, x,y, radius, fill_color, border_color):
+        self.scene.add_object(Circle(x, y, radius, fill_color, border_color))
         self.update()
 
-    def star(self):
-        self.scene.add_object(Star(550, 300, 70, 7, (255, 0, 255), (0, 0, 0), 1402))
+    def star(self, x, y, radius, points, fill_color, border_color, border_width):
+        self.scene.add_object(Star(x, y, radius, points, fill_color, border_color, border_width))
         self.update()
 
     def mousePressEvent(self, event):
@@ -179,9 +179,9 @@ class MyWindow(QMainWindow):
         self.nice_toolbar.addAction("Save", self.save_file)
         self.nice_toolbar.addAction("Info", self.show_info)
         self.nice_toolbar.addAction("Quit", self.show_quit_warning)
-        self.nice_toolbar.addAction("Rectangle", self.paint_area.rectangle)
-        self.nice_toolbar.addAction("Circle", self.paint_area.circle)
-        self.nice_toolbar.addAction("Star", self.paint_area.star)
+        self.nice_toolbar.addAction("Rectangle", self.values_Rectangle)
+        self.nice_toolbar.addAction("Circle", self.values_Circle)
+        self.nice_toolbar.addAction("Star", self.values_Star)
 
     def show_quit_warning(self):
         ret = QMessageBox.question(self, "Ufpasse!", "Möchtest Du das Programm wirklich schließen? :(", QMessageBox.Yes, QMessageBox.No)
@@ -202,6 +202,39 @@ class MyWindow(QMainWindow):
         file_name, selected_filter = QFileDialog.getSaveFileName(self, "Save As", "picture", "PNG Files (*.png)")
         if file_name:
             self.paint_area.image.save(file_name)
+
+    def values_Rectangle(self):
+        x=QInputDialog.getInt(self,"X","X")
+        y=QInputDialog.getInt(self,"Y","Y")
+        width=QInputDialog.getInt(self,"Breite","Pixel")
+        height=QInputDialog.getInt(self,"Höhe","Pixel")
+        fill_color=QInputDialog.getText(self,"Farbe","r,g,b")
+        fill_color=tuple(map(int, fill_color[0].split(",")))
+        border_color=QInputDialog.getText(self,"Randfarbe","r,g,b")
+        border_color=tuple(map(int, border_color[0].split(",")))
+        self.paint_area.rectangle(x[0],y[0],width[0],height[0],fill_color,border_color)
+
+    def values_Circle(self):
+        x=QInputDialog.getInt(self,"X","X")
+        y=QInputDialog.getInt(self,"Y","Y")
+        radius=QInputDialog.getInt(self,"Radius","Pixel")
+        fill_color=QInputDialog.getText(self,"Farbe","r,g,b")
+        fill_color=tuple(map(int, fill_color[0].split(",")))
+        border_color=QInputDialog.getText(self,"Randfarbe","r,g,b")
+        border_color=tuple(map(int, border_color[0].split(",")))
+        self.paint_area.circle(x[0],y[0],radius[0],fill_color,border_color)
+
+    def values_Star(self):
+        x=QInputDialog.getInt(self,"X","X")
+        y=QInputDialog.getInt(self,"Y","Y")
+        radius=QInputDialog.getInt(self,"Radius","Pixel")
+        points=QInputDialog.getInt(self,"Ecken","Anzahl")
+        fill_color=QInputDialog.getText(self,"Farbe","r,g,b")
+        fill_color=tuple(map(int, fill_color[0].split(",")))
+        border_color=QInputDialog.getText(self,"Randfarbe","r,g,b")
+        border_color=tuple(map(int, border_color[0].split(",")))
+        border_width=QInputDialog.getInt(self,"Randbreite","Pixel")
+        self.paint_area.star(x[0],y[0],radius[0],points[0],fill_color,border_color,border_width[0])
 
 if __name__ == "__main__":
     app: QApplication = QApplication(sys.argv)
