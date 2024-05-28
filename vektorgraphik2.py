@@ -144,6 +144,33 @@ class MyPaintArea(QWidget):
             if obj.contains(position):
                 return obj
         return None
+    
+
+    def draw_scene_1(self):
+        self.scene.objects = []
+        self.scene.add_object(Rectangle(200, 150, 200, 200, (255, 255, 255), (0, 255, 0)))
+        self.scene.add_object(Circle(300, 250, 100, (255, 255, 255), (0, 0, 255)))
+        self.update()
+
+    def draw_scene_2(self):
+        cord_x = 100
+        cord_y = 100
+        size = 100
+        offset = 5
+        self.scene.objects = []
+        self.scene.add_object(Circle((cord_x+size/2), cord_y+size/2, size/2, (255, 0, 255), (0, 0, 255)))
+        self.scene.add_object(Rectangle((cord_x+size+offset), cord_y, size, size, (100, 255, 255), (0, 255, 0)))
+        self.scene.add_object(Rectangle((cord_x+size*2)+offset*2, cord_y, size, size, (100, 255, 255), (0, 255, 0)))
+        self.scene.add_object(Circle(cord_x+size*3+size/2+offset*3, cord_y+size/2, size/2, (255, 0, 255), (0, 0, 255)))
+
+        self.scene.add_object(Rectangle(cord_x, cord_y+size+offset, size, size, (100, 255, 255), (0, 255, 0)))
+        self.scene.add_object(Rectangle(cord_x+size*3+offset*3, cord_y+size+offset, size, size, (100, 255, 255), (0, 255, 0)))
+
+        self.scene.add_object(Circle((cord_x+size/2), cord_y+size*2+size/2+offset*2, size/2, (255, 0, 255), (0, 0, 255)))
+        self.scene.add_object(Rectangle((cord_x+size+offset), cord_y+size*2+offset*2, size, size, (100, 255, 255), (0, 255, 0)))
+        self.scene.add_object(Rectangle((cord_x+size*2)+offset*2, cord_y+size*2+offset*2, size, size, (100, 255, 255), (0, 255, 0)))
+        self.scene.add_object(Circle(cord_x+size*3+size/2+offset*3, cord_y+size*2+size/2+offset*2, size/2, (255, 0, 255), (0, 0, 255)))
+        self.update()
 
 class MyWindow(QMainWindow):
     def __init__(self, parent: QWidget):
@@ -157,8 +184,9 @@ class MyWindow(QMainWindow):
         self.setCentralWidget(centralWidget)
 
         #menüs und aktionen
-        self.file_menu: QMenuBar = self.menuBar().addMenu("File")
-        self.help_menu: QMenuBar = self.menuBar().addMenu("Help")
+        self.file_menu: QMenuBar = self.menuBar().addMenu("File...")
+        self.help_menu: QMenuBar = self.menuBar().addMenu("Help...")
+        self.scene_menu: QMenuBar = self.menuBar().addMenu("Scene...")
         self.open_action = self.file_menu.addAction("Open File")
         self.open_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_O))
         self.saveAs_action = self.file_menu.addAction("Save As...")
@@ -167,6 +195,12 @@ class MyWindow(QMainWindow):
         self.quit_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_Q))
         self.info_action = self.help_menu.addAction("Info")
         self.info_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_I))
+        self.scene_1_action = self.scene_menu.addAction("Scene 1")
+        self.scene_1_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_1))
+        self.scene_1_action.triggered.connect(self.paint_area.draw_scene_1)
+        self.scene_2_action = self.scene_menu.addAction("Scene 2")
+        self.scene_2_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_2))
+        self.scene_2_action.triggered.connect(self.paint_area.draw_scene_2)
 
         self.open_action.triggered.connect(self.load_file)
         self.saveAs_action.triggered.connect(self.save_file)
