@@ -3,40 +3,45 @@ from PySide6.QtGui import QKeySequence, QImage, QPainter, QColor
 from PySide6.QtWidgets import QApplication, QMenuBar, QToolBar, QWidget, QFileDialog, QMainWindow, QMessageBox, QVBoxLayout
 import sys
 import math
-
+from abc import ABC ,abstractmethod
 # Datenstrukturen für Vektorgrafik
-class Rectangle:
-    def __init__(self, x, y, width, height, fill_color, border_color):
+##!Geändert mit oberklasse "Shape", allerdings noch keine "draw funktion"(unsicher wie wir das umsetzen,
+#  da die bei uns im renderer sind..., noch nicht eingabefenster überarbeitet)
+class Shape(ABC):
+    def __init__(self, x, y, fill_color, border_color, border_width):
         self.x = x
         self.y = y
-        self.width = width
-        self.height = height
         self.fill_color = fill_color
         self.border_color = border_color
+        self.border_width = border_width
+
+    @abstractmethod
+    def painter(self):
+        pass
+
+##! Haben alle jetzt "border width" 
+class Rectangle(Shape):
+    def __init__(self, x, y, width, height, fill_color, border_color, border_width):
+        super().__init__(x,y,fill_color, border_color, border_width)
+        self.width = width
+        self.height = height
 
     def contains(self, point):
         return self.x <= point.x() <= self.x + self.width and self.y <= point.y() <= self.y + self.height
 
 class Circle:
-    def __init__(self, x, y, radius, fill_color, border_color):
-        self.x = x
-        self.y = y
+    def __init__(self, x, y, radius, fill_color, border_color, border_width):
+        super().__init__(x,y,fill_color, border_color, border_width)
         self.radius = radius
-        self.fill_color = fill_color
-        self.border_color = border_color
 
     def contains(self, point):
         return (self.x - point.x())**2 + (self.y - point.y())**2 <= self.radius**2
 
 class Star:
     def __init__(self, x, y, radius, points, fill_color, border_color, border_width):
-        self.x = x
-        self.y = y
+        super().__init__(x,y,fill_color, border_color, border_width)
         self.radius = radius
         self.points = points
-        self.fill_color = fill_color
-        self.border_color = border_color
-        self.border_width = border_width
 
     def contains(self, point):
         # A simple bounding box check for demonstration purposes
